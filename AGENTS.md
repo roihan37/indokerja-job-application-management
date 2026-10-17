@@ -75,7 +75,13 @@ Unless all mandatory work is finished and tested, **do not** add:
 
 A functional and deployed MVP is more important than optional enhancements.
 
-## 5. Recommended Repository Structure
+## 5. Official Layer-Based Architecture
+
+Use layer-based backend organization with this request flow:
+
+**Routes → Controllers → Services → Prisma ORM → PostgreSQL**
+
+The tree below is the target structure. The existing backend still uses `src/modules/`; migrate it incrementally without changing the API contract. Frontend folders remain guidance for its implementation.
 
 ```text
 indokerja-job-application-management/
@@ -98,18 +104,58 @@ indokerja-job-application-management/
 │   │   ├── migrations/
 │   │   └── seed.ts
 │   └── src/
-│       ├── modules/
-│       │   ├── auth/
-│       │   ├── jobs/
-│       │   └── applications/
+│       ├── routes/
+│       │   ├── auth.routes.ts
+│       │   ├── jobs.routes.ts
+│       │   ├── applications.routes.ts
+│       │   └── index.ts
+│       ├── controllers/
+│       │   ├── auth.controller.ts
+│       │   ├── jobs.controller.ts
+│       │   └── applications.controller.ts
+│       ├── services/
+│       │   ├── auth.service.ts
+│       │   ├── jobs.service.ts
+│       │   └── applications.service.ts
+│       ├── validators/
+│       │   ├── auth.schema.ts
+│       │   ├── jobs.schema.ts
+│       │   └── applications.schema.ts
 │       ├── middleware/
+│       │   ├── authenticate.ts
+│       │   ├── authorize.ts
+│       │   ├── validate.ts
+│       │   └── errorHandler.ts
 │       ├── lib/
-│       └── app.ts
+│       │   ├── prisma.ts
+│       │   └── jwt.ts
+│       ├── utils/
+│       │   ├── AppError.ts
+│       │   └── asyncHandler.ts
+│       ├── types/
+│       │   └── express.d.ts
+│       ├── app.ts
+│       └── server.ts
 └── docs/
     └── api.md
 ```
 
-Adapt the structure if necessary for simplicity. Avoid introducing files or folders with no immediate use.
+### Layer responsibilities
+
+- **Routes:** Register endpoints, apply authentication, role authorization, and validation middleware, then delegate to controllers. No business logic or database queries.
+- **Controllers:** Read validated input and authenticated context, call services, and return the documented HTTP statuses and JSON envelopes. No Prisma queries or business rules.
+- **Services:** Implement business rules and access PostgreSQL through Prisma. Accept typed values and authenticated identity rather than Express `Request` or `Response` objects. Enforce ownership, perform duplicate-application checks, and retain the database unique constraint and conflict handling for races. Create applications with their initial history atomically; update status and insert history in one transaction, preserving the documented no-op and concurrency behavior.
+- **Validators:** Define Zod schemas for bodies, route parameters, and query parameters. Keep inferred input types alongside schemas; validation middleware makes parsed data available to controllers without unsafe casts.
+- **Middleware:** Authenticate JWTs, enforce role permissions, validate requests, and handle errors centrally. Resource ownership remains a service responsibility.
+- **Supporting files:** `lib/prisma.ts` provides the shared Prisma client; `lib/jwt.ts` centralizes token signing and verification settings. `utils/AppError.ts` represents safe application errors, and `types/express.d.ts` declares authenticated request context. `app.ts` composes Express without listening; `server.ts` handles configuration, database startup, listening, and shutdown. Retain useful configuration and domain type files in the appropriate layers.
+
+Express 5 already forwards rejected async handlers to error middleware. The target `utils/asyncHandler.ts` is conditional: add it only if explicit async forwarding is needed; do not create a redundant wrapper or empty placeholder.
+
+Do not organize backend source into feature folders such as `modules/auth`, `modules/jobs`, or `modules/applications`. Services query Prisma directly; do not add a Repository Pattern, CQRS, dependency-injection containers, microservices, Redis, queues, or unrelated dependencies. Create only files with an immediate purpose.
+
+### Migration guidance
+
+The next coding milestone is a behavior-preserving backend migration: extract validators and reusable middleware, move services into `services/`, extract thin controllers, and wire the route modules. Move startup to `server.ts` and update scripts and imports together. Preserve existing testability, JWT settings, ownership checks, duplicate conflict handling, and atomic history updates. Add the service-level duplicate lookup while keeping the database constraint authoritative. Run formatting, lint, typecheck, build, and the focused PostgreSQL integration tests before frontend work. No new endpoints or schema changes are required by this architecture decision.
 
 ## 6. Database Design Rules
 
@@ -182,10 +228,21 @@ Frontend requirements:
 - Validate tokens, authentication, role, and resource ownership on protected routes.
 - Use Prisma parameterized queries and avoid unsafe raw SQL.
 - Catch async errors with centralized Express error middleware.
-- Keep controllers/routes focused; extract business logic when it improves clarity.
-- Use TypeScript strict mode when practical; avoid `any` without a documented reason.
+- Follow the layer boundaries in section 5; keep controllers thin and business logic in services.
+- Enable TypeScript strict mode; avoid `any` without a documented reason.
 - Prefer straightforward, readable code over clever abstractions.
 - Never silence failing tests or weaken security checks simply to make CI pass.
+
+### Code Style & Readability
+
+- Use Prettier: 2 spaces, single quotes in JavaScript/TypeScript, semicolons, trailing commas, and an 80-character print width. Run `npm run format` or `npm run format:check` inside each initialized application.
+- Use TypeScript-aware ESLint and strict TypeScript. Run `npm run lint` and `npm run typecheck`; do not suppress failures or introduce unjustified `any` types.
+- Group imports as side effects, Node built-ins, external packages, then local modules, with blank lines between groups. Sort module paths within groups and named imports alphabetically; use explicit type imports. Avoid an import-sorting dependency solely for this convention.
+- Use descriptive camelCase names for values/functions, PascalCase for types/React components, and UPPER_SNAKE_CASE for fixed configuration constants. Avoid unnecessary abbreviations, oversized functions, and deeply nested conditionals; use braces and early returns.
+- Use async/await consistently with centralized error handling. Keep inferred request types with their Zod schemas and prefer Prisma-generated domain types where appropriate; follow section 5 for backend layer responsibilities.
+- For future frontend code, use functional TypeScript components, PascalCase component files and `useCamelCase` hooks. Keep API calls in service modules and handle loading, empty, success, and error states explicitly. Reuse components when they remove real duplication.
+- Comments should explain non-obvious business or security decisions in concise English. Preserve the API contract in `docs/api.md`; report inconsistencies before changing it, and never change API behavior solely for architecture or style.
+- Keep formatting and refactors scoped. Add tooling to future applications when initialized; verify formatting, lint, typecheck, build, and relevant tests before reporting completion.
 
 ## 10. Mandatory Tests to Prioritize
 
