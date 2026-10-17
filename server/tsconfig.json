@@ -8,5 +8,5 @@
     "outDir": "dist",
     "skipLibCheck": true
   },
-  "include": ["src", "prisma/seed.ts", "tests"]
+  "include": ["src", "prisma/seed.ts", "test"]
 }

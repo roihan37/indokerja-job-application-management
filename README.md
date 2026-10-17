@@ -45,14 +45,49 @@ npm run build
 
 Run `npm run format` inside `server/` to apply formatting. Prettier uses 2 spaces, single quotes, semicolons, trailing commas, and an 80-character print width. ESLint checks TypeScript, imports, braces, and promise handling. See the Code Style & Readability section in `AGENTS.md` for shared conventions.
 
-Integration tests require a **separate PostgreSQL database**. They use real PostgreSQL constraints and transactions, create uniquely named fixtures, and delete only those fixtures afterward. They fail explicitly if `TEST_DATABASE_URL` is missing.
+Tests use the existing **Node Test Runner**, TypeScript through `tsx`, and Supertest against `createApp()`; they do not start the production server. No additional test dependencies are needed. Unit tests use small Prisma substitutes; database constraints, transactions, and HTTP authorization are tested against real PostgreSQL.
 
-```sh
-DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/indokerja_test npm run db:migrate
-TEST_DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/indokerja_test npm test
+```text
+server/test/
+├── setup.ts
+├── helpers/
+│   ├── authHelper.ts
+│   ├── mockDatabase.ts
+│   ├── testDatabase.ts
+│   └── testFactory.ts
+├── unit/
+│   ├── helpers/testDatabase.test.ts
+│   └── services/
+│       ├── auth.service.test.ts
+│       ├── jobs.service.test.ts
+│       └── applications.service.test.ts
+└── integration/
+    ├── auth.test.ts
+    ├── jobs.test.ts
+    ├── applications.test.ts
+    ├── authorization.test.ts
+    └── errors.test.ts
 ```
 
-Coverage includes credentials/JWT validation, role boundaries, job listing/creation, concurrent duplicate applications and direct database constraint rejection, seeker isolation, cross-company ownership, status/no-op history, concurrent status changes, and transaction rollback.
+```sh
+npm run test:unit
+```
+
+Integration tests require a **dedicated PostgreSQL database**, created beforehand by your PostgreSQL administrator/user. Set `TEST_DATABASE_URL` in your local untracked `.env` or shell. Its database name must end in `_test`, its schema must be `public`, and it must differ from `DATABASE_URL`. The suite checks these conditions before migrating or cleaning up. Never point it at a database containing development or production data. The guard cannot detect every DNS alias to the same server; configure distinct database names.
+
+```sh
+# Example only: replace connection credentials and create indokerja_test first.
+export TEST_DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/indokerja_test
+npm run test:integration
+npm test
+npm run test:coverage
+```
+
+Tests apply existing migrations automatically using the dedicated URL; do not change the application `DATABASE_URL` to run tests. Each test creates fresh fixtures in a transaction with unique email prefixes and runtime-generated credentials. Cleanup deletes only those fixtures, in foreign-key order; it never truncates tables or uses development seed data. Database tests run serially; concurrency cases explicitly submit simultaneous requests. Do not run multiple integration commands against the same database at once.
+
+Coverage uses Node's native experimental V8 coverage report, restricted to loaded `src/**/*.ts` files; generated Prisma code and test helpers are excluded. Startup-only code is not exercised by Supertest. The command prints line, branch, and function coverage in the terminal.
+
+Cases cover credentials/JWT claims and verification, missing credentials, role boundaries, required job fields, job listing/creation, concurrent duplicate applications and direct database constraint rejection, seeker isolation, cross-company ownership, all supported statuses, no-op history, concurrent status changes, transaction rollback, database safety guards, and serialization retry limits.
 
 ## Production
 
