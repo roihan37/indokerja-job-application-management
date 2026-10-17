@@ -81,7 +81,7 @@ Use layer-based backend organization with this request flow:
 
 **Routes → Controllers → Services → Prisma ORM → PostgreSQL**
 
-The tree below is the target structure. The existing backend still uses `src/modules/`; migrate it incrementally without changing the API contract. Frontend folders remain guidance for its implementation.
+The backend follows the layer-based structure below. Frontend folders remain guidance for its implementation. Create supporting files only when needed.
 
 ```text
 indokerja-job-application-management/
@@ -153,9 +153,9 @@ Express 5 already forwards rejected async handlers to error middleware. The targ
 
 Do not organize backend source into feature folders such as `modules/auth`, `modules/jobs`, or `modules/applications`. Services query Prisma directly; do not add a Repository Pattern, CQRS, dependency-injection containers, microservices, Redis, queues, or unrelated dependencies. Create only files with an immediate purpose.
 
-### Migration guidance
+### Architecture maintenance
 
-The next coding milestone is a behavior-preserving backend migration: extract validators and reusable middleware, move services into `services/`, extract thin controllers, and wire the route modules. Move startup to `server.ts` and update scripts and imports together. Preserve existing testability, JWT settings, ownership checks, duplicate conflict handling, and atomic history updates. Add the service-level duplicate lookup while keeping the database constraint authoritative. Run formatting, lint, typecheck, build, and the focused PostgreSQL integration tests before frontend work. No new endpoints or schema changes are required by this architecture decision.
+Keep validators and reusable middleware separate from thin controllers, services, and route modules. Startup lives in `server.ts`; update scripts and imports together when moving entry points. Preserve testability, JWT settings, ownership checks, duplicate conflict handling, and atomic history updates. Retain the service-level duplicate lookup while keeping the database constraint authoritative. Run formatting, lint, typecheck, build, and the focused PostgreSQL integration tests before frontend work. This architecture does not require additional endpoints or schema changes.
 
 ## 6. Database Design Rules
 

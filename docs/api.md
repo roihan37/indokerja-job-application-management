@@ -4,7 +4,7 @@
 **Assessment:** IndoKerja.id Full Stack Developer  
 **API style:** REST + JSON  
 **Suggested local base URL:** `http://localhost:4000/api`  
-**Status:** **Proposed API contract, not a verified record of implemented endpoints.** Update this file to reflect the actual routes, payloads, and HTTP responses before submission.
+**Status:** Implemented backend contract, verified locally by PostgreSQL HTTP integration tests. Deployment verification is pending.
 
 > **Source of requirements:** IndoKerja.id technical assessment and repository `AGENTS.md`. The assessment defines functionality and technologies, **not** route names or JSON payloads. The endpoint paths, response envelope, ID strings, job-type values, and salary convention below are implementation decisions proposed for this project.
 
@@ -12,7 +12,7 @@
 
 ### Authentication
 
-- The login endpoint is public. All other endpoints in this draft require a valid JWT access token.
+- The login endpoint is public. All other endpoints require a valid JWT access token. Tokens expire after one hour, use HS256, and require issuer `indokerja` and audience `indokerja-api`. The server loads the current user role/company from PostgreSQL after token verification. There is no refresh endpoint; login again after expiry.
 - Send authenticated requests with `Authorization: Bearer <access_token>`.
 - The server determines the user's role and identity from the verified token, **never** from user-supplied `role`, `companyId`, or `jobSeekerId` fields.
 - Supported roles: `JOB_SEEKER` and `COMPANY`.
@@ -21,10 +21,10 @@
 ### Content type and IDs
 
 - Request/response content type: `application/json`.
-- `:id` is an opaque database identifier (string). Example values such as `job_123` are illustrative, not a required Prisma ID format.
+- `:id` is an opaque database identifier (1–128 ASCII letters, digits, underscores, or hyphens); generated IDs use CUIDs. Example values such as `job_123` are illustrative, not a required Prisma ID format.
 - Timestamps use ISO 8601 in UTC, for example `2026-10-18T02:00:00.000Z`.
-- **Proposed salary convention:** `salary` is a nonnegative integer indicating **IDR per month**, with `0` representing an unspecified amount only if the application explicitly supports that convention. To avoid ambiguity, prefer a documented nonnegative integer salary for this assessment.
-- **Suggested job types:** `FULL_TIME`, `PART_TIME`, `CONTRACT`, `INTERNSHIP`. These are proposed API enum values, not categories specified by the assessment.
+- `salary` is a whole integer from `0` through `2147483647` in **IDR per month**. Zero means zero, not unspecified.
+- **Supported job types:** `FULL_TIME`, `PART_TIME`, `CONTRACT`, `INTERNSHIP`. These are implementation choices, not categories specified by the assessment.
 
 ### Consistent success format
 
@@ -111,6 +111,8 @@ The paths above match the *suggested routes* in `AGENTS.md`. Implement them cons
 }
 ```
 
+**Validation:** Trimmed, case-normalized email (maximum 254 characters); password 1–256 characters; unknown fields rejected.
+
 **Failures:** `400` invalid input; `401` invalid credentials. Password hashes must never appear in responses.
 
 ## 4. Jobs
@@ -142,7 +144,9 @@ The paths above match the *suggested routes* in `AGENTS.md`. Implement them cons
 }
 ```
 
-**Failures:** `401` unauthenticated. Empty list returns `200` with `data: []`.
+**Query:** optional `mine=true` filters jobs to the authenticated company; `mine=false` or omission lists all jobs. `mine=true` requires `COMPANY` and an associated company. Unknown query fields or values return `400`. No pagination or search is implemented. Results sort by creation time descending, then ID ascending.
+
+**Failures:** `400` invalid query; `401` unauthenticated; `403` seeker requesting `mine=true`. Empty list returns `200` with `data: []`.
 
 ### `GET /api/jobs/:id`
 
@@ -170,7 +174,7 @@ The paths above match the *suggested routes* in `AGENTS.md`. Implement them cons
 }
 ```
 
-**Failures:** `401` unauthenticated; `404` nonexistent job.
+**Failures:** `400` malformed ID; `401` unauthenticated; `404` nonexistent job.
 
 ### `POST /api/jobs`
 
@@ -207,7 +211,7 @@ The paths above match the *suggested routes* in `AGENTS.md`. Implement them cons
 }
 ```
 
-**Validation:** Require nonempty `title` and `location`, nonnegative integer `salary`, supported `jobType`, and optional string `description` (with reasonable length limits). `companyId` must be derived from the authenticated company account, not request input.
+**Validation:** Require trimmed nonempty `title` and `location` (at most 200 characters each), integer `salary` from 0 through 2147483647, supported `jobType`, and optional trimmed string `description` (at most 10000 characters). Unknown request fields are rejected. `companyId` must be derived from the authenticated company account, not request input.
 
 **Failures:** `400` invalid input; `401` unauthenticated; `403` wrong role.
 
@@ -218,7 +222,7 @@ The paths above match the *suggested routes* in `AGENTS.md`. Implement them cons
 **Access:** `JOB_SEEKER` only  
 **Purpose:** Apply to a job once per `(jobId, jobSeekerId)` pair.
 
-**Request:** No request body is needed; infer the job from `:id` and Job Seeker from the JWT.
+**Request:** No body or an empty object; unknown fields are rejected. Infer the job from `:id` and Job Seeker from the authenticated user.
 
 **Response `201`**
 
@@ -254,7 +258,7 @@ The paths above match the *suggested routes* in `AGENTS.md`. Implement them cons
 }
 ```
 
-**Other failures:** `401` unauthenticated; `403` wrong role; `404` job not found.
+**Other failures:** `400` invalid body or ID; `401` unauthenticated; `403` wrong role; `404` job not found.
 
 ### `GET /api/applications/me`
 
@@ -313,7 +317,7 @@ The paths above match the *suggested routes* in `AGENTS.md`. Implement them cons
 
 **Rules:** Check job ownership using the authenticated company's identity **before** returning candidate information. Do not expose password hashes or unrelated applicants.
 
-**Failures:** `401` unauthenticated; `403` wrong role or a job owned by another company; `404` nonexistent job.
+**Failures:** `400` malformed ID; `401` unauthenticated; `403` wrong role or a job owned by another company; `404` nonexistent job.
 
 ### `PATCH /api/applications/:id/status`
 
@@ -356,11 +360,11 @@ The paths above match the *suggested routes* in `AGENTS.md`. Implement them cons
 
 1. Verify the user has role `COMPANY` and owns the job linked to this application.
 2. Validate that `status` is one of the five supported values.
-3. If the status **changes**, atomically update `Application.status` and create an `ApplicationHistory` record with `previousStatus`, `newStatus`, `changedById`, and timestamp, using a Prisma transaction.
-4. **Proposed no-op policy:** if the requested status already equals the current status, return `200` with the unchanged application; do **not** add a history entry. Document any different implementation.
+3. Use a serializable Prisma transaction, retrying serialization conflicts up to three times after the initial attempt. Read the current status and check ownership inside that transaction. If the status **changes**, atomically update `Application.status` and create an `ApplicationHistory` record with `previousStatus`, `newStatus`, `changedById`, and timestamp, using a Prisma transaction.
+4. **No-op policy:** if the requested status already equals the current status, return `200` with the unchanged application; do **not** add a history entry. The `updatedAt` timestamp also remains unchanged. No additional transition restrictions apply between supported statuses.
 5. Do not permit modification of `jobId`, `jobSeekerId`, or company ownership through this endpoint.
 
-**Failures:** `400` invalid status; `401` unauthenticated; `403` wrong role or non-owned application; `404` nonexistent application.
+**Failures:** `400` invalid status, extra body fields, or malformed ID; `401` unauthenticated; `403` wrong role or non-owned application; `404` nonexistent application.
 
 ## 6. Application History: Data Requirement
 
@@ -401,19 +405,19 @@ The company-account association may differ in the actual Prisma schema, but owne
 
 Frontend guards are useful for navigation, but **all permission and ownership checks must be enforced on the backend**.
 
-## 8. Validation and Security Checklist
+## 8. Validation and Security Checklist (local verification)
 
-- [ ] JWT is verified server-side on protected routes.
-- [ ] Passwords are stored as secure hashes and never returned by APIs.
-- [ ] Request bodies, params, and optional query parameters are validated.
-- [ ] Login, job creation, apply, applicant listing, and status update enforce roles.
-- [ ] Resource ownership is verified before returning or updating applicants.
-- [ ] `(jobId, jobSeekerId)` has a database-level composite unique constraint.
-- [ ] Application creation and initial history insertion are transactional.
-- [ ] Status mutation and its history insertion are transactional.
-- [ ] Prisma unique-constraint errors result in `409` on duplicate applications.
-- [ ] Errors return a consistent JSON format and do not expose internal details.
-- [ ] All data is stored in PostgreSQL and survives restarts.
+- [x] JWT is verified server-side on protected routes.
+- [x] Passwords are stored as secure hashes and never returned by APIs.
+- [x] Request bodies, params, and optional query parameters are validated.
+- [x] Login, job creation, apply, applicant listing, and status update enforce roles.
+- [x] Resource ownership is verified before returning or updating applicants.
+- [x] `(jobId, jobSeekerId)` has a database-level composite unique constraint.
+- [x] Application creation and initial history insertion are transactional.
+- [x] Status mutation and its history insertion are transactional.
+- [x] Prisma unique-constraint errors result in `409` on duplicate applications.
+- [x] Errors return a consistent JSON format and do not expose internal details.
+- [x] All application data is stored in PostgreSQL; deployment persistence verification is pending.
 
 ## 9. Minimum API Test Scenarios
 
@@ -469,7 +473,7 @@ curl -X PATCH "$BASE_URL/applications/app_123/status" \
   -d '{"status":"Reviewing"}'
 ```
 
-> Replace sample IDs, accounts, and tokens with real seeded data. These commands illustrate the intended contract; they do not prove a running backend.
+> Replace sample IDs, accounts, and tokens with real seeded data. These commands illustrate the implemented contract; deployment verification is pending.
 
 ## 11. Before Submission
 
