@@ -1,259 +1,221 @@
-# IndoKerja Job Application Management
+# IndoKerja | Job Application Management System
 
-Job application management for the IndoKerja full-stack assessment: a React frontend in `client/` and an Express REST API in `server/`, backed by PostgreSQL and Prisma. Deployment and deployed end-to-end verification remain submission tasks.
+IndoKerja adalah aplikasi pengelolaan lamaran kerja dengan dua peran: Job Seeker dan Company. Kandidat dapat melamar pekerjaan dan memantau statusnya, sedangkan perusahaan dapat meninjau pelamar untuk lowongan miliknya.
 
-## Requirements and local setup
+**[Live Demo](https://indokerja-job-application-managemen-theta.vercel.app/)** · **[GitHub Repository](https://github.com/roihan37/indokerja-job-application-management)**
 
-- Node.js 24 LTS (24.15+ recommended), npm, and PostgreSQL. The supported
-  range is `^22.22.2 || ^24.15.0 || >=26.0.0`, matching the frontend test
-  dependencies (including jsdom); React Router also requires Node 22.22+.
-- Run commands below inside `server/`.
+## Demo Accounts
 
-```sh
-npm ci
-cp .env.example .env
-```
+| Role         | Email                |
+| ------------ | -------------------- |
+| Company 1    | company1@example.com |
+| Company 2    | company2@example.com |
+| Job Seeker 1 | seeker@example.com   |
+| Job Seeker 2 | seeker2@example.com  |
 
-Edit `.env`: configure `DATABASE_URL`, set a randomly generated `JWT_SECRET` of at least 32 characters, and choose a demo-only `DEMO_PASSWORD` (12+ characters, at most 72 UTF-8 bytes). Never reuse a real password or commit `.env`.
+**Password demo production untuk semua akun: `DemoIndokerja123!`**
 
-```sh
-npm run db:generate
-npm run db:migrate
-npm run db:seed
-npm run dev
-```
+Akun disiapkan melalui seed database. Password lokal mengikuti `DEMO_PASSWORD` dan dapat berbeda dari password production. Gunakan akun dan dokumen contoh khusus demo.
 
-The API runs at `http://localhost:4000/api`. Configure `PORT` and `CLIENT_ORIGIN` as needed. Seed can be rerun; it updates demo passwords and jobs without deleting applications.
+## Fitur
 
-### Frontend
+**Job Seeker**
 
-In another terminal, run these commands inside `client/`:
+- Menelusuri, mencari, dan memfilter lowongan; melihat detail pekerjaan.
+- Melamar satu kali per lowongan, dengan pilihan lampiran resume.
+- Melihat daftar lamaran sendiri dan status terkininya.
+- Mengubah profil kandidat serta mengunggah, memilih, melihat, dan mengunduh resume PDF.
 
-```sh
-npm ci
-cp .env.example .env
-npm run dev
-```
+**Company**
 
-Vite serves the frontend at `http://localhost:5173`. Set `VITE_API_BASE_URL` to the API base URL including `/api` (default: `http://localhost:4000/api`) and set the backend `CLIENT_ORIGIN` to the frontend origin. Restart Vite after changing local environment variables. Every `VITE_` variable is public browser configuration; keep database credentials and JWT secrets in the backend environment only.
+- Membuat lowongan dan melihat daftar lowongan perusahaan sendiri.
+- Melihat pelamar, profil kandidat, dan resume yang dilampirkan pada lamaran untuk lowongan miliknya.
+- Mengubah status menjadi `Applied`, `Reviewing`, `Shortlisted`, `Rejected`, atau `Accepted`.
 
-The client uses React, strict TypeScript, React Router, TanStack Query, React Hook Form, Zod, Tailwind CSS 4 through its Vite plugin, and shadcn/ui components. Job Seekers can browse, view, and apply to jobs and track their applications. Companies can create jobs, view their own applicants, and update application statuses. Use the seeded accounts below; registration is outside scope.
+Backend memvalidasi JWT, peran, dan kepemilikan sumber daya. Duplikasi lamaran dicegah dengan unique constraint database. Status awal dan setiap perubahan status disimpan dalam `ApplicationHistory`; pembaruan status dan riwayat berjalan dalam satu transaksi. Status yang tidak berubah tidak menghasilkan riwayat tambahan. Riwayat perubahan belum ditampilkan sebagai timeline di UI atau endpoint baca tersendiri.
 
-Sessions use `sessionStorage` for the current browser tab and expire with the one-hour access token. Logout and expired sessions clear authenticated query data. Backend role and ownership checks remain authoritative. Search and job-type filters operate on the complete jobs response in the browser; the API has no search or pagination parameters. Application history is persisted by the backend; there is no history endpoint or frontend history view.
+## Tech Stack
 
-Run frontend checks inside `client/`:
+Versi berikut mengikuti deklarasi dependency di repository; lockfile menentukan versi instalasi.
 
-```sh
-npm run format:check
-npm run lint
-npm run typecheck
-npm test
-npm run build
-```
+| Bagian                 | Teknologi                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------ |
+| Frontend               | React 19, TypeScript 5.9, Vite 8, React Router 8, Tailwind CSS 4, komponen shadcn/ui berbasis Radix UI |
+| Data dan form frontend | TanStack Query 5, React Hook Form 7, Zod 4                                                             |
+| Backend                | Node.js, Express 5, TypeScript 5.9, Zod 4                                                              |
+| Database / ORM         | PostgreSQL / Prisma 6                                                                                  |
+| Authentication         | JWT bearer token, bcryptjs untuk password hash                                                         |
+| File Storage           | Supabase Storage, private bucket                                                                       |
+| Testing                | Node.js test runner, Supertest; Vitest, React Testing Library, jsdom                                   |
+| Deployment             | Vercel, Railway, Supabase                                                                              |
 
-Frontend tests use Vitest and React Testing Library. All frontend tests, setup, and fixtures live in `client/test/`, with subfolders matching the source structure. Backend tests live in `server/test/`. Keep test files outside `src/` in both applications. `npm run format` applies the same shared formatting conventions as the backend.
-
-## Demo accounts
-
-| Email                | Role                                   |
-| -------------------- | -------------------------------------- |
-| seeker@example.com   | Job Seeker                             |
-| seeker2@example.com  | Second Job Seeker for isolation checks |
-| company1@example.com | Company: Example Technology            |
-| company2@example.com | Company: Nusantara Digital             |
-
-All use the password supplied through `DEMO_PASSWORD` during seeding. Document the deployed demo-only password when preparing the submission. Each company has a demo job: `demo-job-1` and `demo-job-2`.
-
-After applying migrations, run `npm run db:seed` inside `server/` to add
-candidate-profile demo data. Andi Pratama (`seeker@example.com`) has a complete
-profile; Siti Rahma (`seeker2@example.com`) has optional fields left empty to
-demonstrate fallbacks. Both candidates have an application for each demo job,
-so either company can open candidate details immediately. New applications
-include their initial `Applied` history entry atomically.
-
-Rerunning seed preserves existing profiles, application statuses, CV attachments,
-and history; it does not reset the database or duplicate applications. Seed does
-not create fake CV metadata or upload files to Supabase. To test CV selection,
-preview, and download, configure private Storage and upload a real PDF through
-the candidate's Profile page, then apply to a newly created job with that CV.
-Previously submitted demo applications intentionally remain without a CV.
-
-## Checks
-
-Run the following backend commands inside `server/`.
-
-```sh
-npm run format:check
-npm run lint
-npm run typecheck
-npm run build
-```
-
-Run `npm run format` inside `server/` to apply formatting. Prettier uses 2 spaces, single quotes, semicolons, trailing commas, and an 80-character print width. ESLint checks TypeScript, imports, braces, and promise handling. See the Code Style & Readability section in `AGENTS.md` for shared conventions.
-
-Tests use the existing **Node Test Runner**, TypeScript through `tsx`, and Supertest against `createApp()`; they do not start the production server. No additional test dependencies are needed. Unit tests use small Prisma substitutes; database constraints, transactions, and HTTP authorization are tested against real PostgreSQL.
+## Struktur dan Arsitektur
 
 ```text
-server/test/
-├── setup.ts
-├── helpers/
-│   ├── authHelper.ts
-│   ├── mockDatabase.ts
-│   ├── testDatabase.ts
-│   └── testFactory.ts
-├── unit/
-│   ├── helpers/testDatabase.test.ts
-│   └── services/
-│       ├── auth.service.test.ts
-│       ├── jobs.service.test.ts
-│       └── applications.service.test.ts
-└── integration/
-    ├── auth.test.ts
-    ├── jobs.test.ts
-    ├── applications.test.ts
-    ├── authorization.test.ts
-    └── errors.test.ts
+.
+├── client/
+│   ├── src/{components,pages,routes,services,types}/
+│   ├── test/
+│   └── .env.example
+├── server/
+│   ├── src/{routes,controllers,services,middleware,validators,lib,types,utils}/
+│   ├── prisma/{migrations,schema.prisma,seed.ts}
+│   ├── test/
+│   └── .env.example
+├── docs/
+│   ├── api.md
+│   └── railway-migration-recovery.md
+├── AGENTS.md
+└── README.md
 ```
 
-```sh
-npm run test:unit
-```
+Alur backend: **Routes → Controllers → Services → Prisma → PostgreSQL**. Middleware menangani authentication, authorization, validation, dan error terpusat. API client frontend berada di `client/src/services/`.
 
-Integration tests require a **dedicated PostgreSQL database**, created beforehand by your PostgreSQL administrator/user. Set `TEST_DATABASE_URL` in your local untracked `.env` or shell. Its database name must end in `_test`, its schema must be `public`, and it must differ from `DATABASE_URL`. The suite checks these conditions before migrating or cleaning up. Never point it at a database containing development or production data. The guard cannot detect every DNS alias to the same server; configure distinct database names.
+Relasi utama: User memiliki Company atau profil kandidat; Company memiliki Job; Application menghubungkan Job dengan Job Seeker dan opsional Resume. Setiap Application memiliki ApplicationHistory. Gaji disimpan sebagai bilangan bulat rupiah per bulan, minimal nol.
 
-```sh
-# Example only: replace connection credentials and create indokerja_test first.
-export TEST_DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/indokerja_test
+## Menjalankan Secara Lokal
+
+1. **Siapkan prasyarat.** Instal Git, npm, PostgreSQL beserta CLI `createdb`, dan Node.js yang sesuai `engines` kedua aplikasi: `^22.22.2 || ^24.15.0 || >=26.0.0`. Pilihan praktis: Node.js 24.15.0 atau patch 24.x yang lebih baru. Pastikan PostgreSQL aktif dan akun database dapat membuat database.
+
+2. **Clone repository dan buat database lokal.**
+
+   ```bash
+   git clone https://github.com/roihan37/indokerja-job-application-management.git
+   cd indokerja-job-application-management
+   createdb -h localhost -U <postgres-user> indokerja
+   ```
+
+   Ganti `<postgres-user>` dengan akun PostgreSQL Anda. CLI akan menggunakan mekanisme authentication PostgreSQL lokal; bila diminta, masukkan password akun tersebut.
+
+3. **Terminal pertama: instal dan konfigurasi backend.**
+
+   ```bash
+   cd server
+   npm ci
+   cp .env.example .env
+   ```
+
+   Edit `server/.env`: isi `DATABASE_URL` dengan pola `postgresql://<user>:<password>@localhost:5432/indokerja?schema=public`, gunakan password yang di-URL-encode bila mengandung karakter khusus. Tetapkan `JWT_SECRET` acak minimal 32 karakter dan `DEMO_PASSWORD` khusus demo minimal 12 karakter, maksimal 72 byte UTF-8. Placeholder harus diganti sebelum menjalankan aplikasi atau seed.
+
+   Pertahankan `PORT=4000` dan `CLIENT_ORIGIN=http://localhost:5173`. Konfigurasi Supabase dijelaskan di bawah; fitur inti selain penyimpanan resume dapat berjalan tanpa Supabase.
+
+4. **Generate Prisma Client, jalankan migration, lalu seed dan server.** Masih di `server/`:
+
+   ```bash
+   npm run db:generate
+   npm run db:migrate
+   npm run db:seed
+   npm run dev
+   ```
+
+   API lokal: `http://localhost:4000/api`. Tidak ada halaman beranda atau health endpoint khusus; membuka `/` dapat menghasilkan respons 404.
+
+5. **Terminal kedua: instal dan jalankan frontend.** Mulai dari root repository:
+
+   ```bash
+   cd client
+   npm ci
+   cp .env.example .env
+   npm run dev
+   ```
+
+   Pastikan `client/.env` berisi `VITE_API_BASE_URL=http://localhost:4000/api`. Buka **http://localhost:5173**, lalu login memakai email demo dan nilai `DEMO_PASSWORD` lokal. Gunakan port 5173; jika Vite memakai port lain, sesuaikan `CLIENT_ORIGIN` dan restart backend. Restart Vite setelah mengubah `.env`.
+
+## Environment Variables
+
+File lokal: `server/.env` dan `client/.env`, dibuat dari `.env.example` masing-masing. Jangan commit `.env` atau secret. Pada production, atur variabel lewat platform deployment.
+
+| Variabel                  | Lokasi / kebutuhan         | Keterangan                                                                                                                   |
+| ------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`            | Backend, wajib             | URL PostgreSQL untuk runtime, Prisma migration, dan seed.                                                                    |
+| `JWT_SECRET`              | Backend, wajib             | Secret minimal 32 karakter; gunakan nilai acak yang kuat.                                                                    |
+| `PORT`                    | Backend, opsional          | Default `4000`; Railway menyediakan port runtime.                                                                            |
+| `CLIENT_ORIGIN`           | Backend                    | Origin frontend yang diizinkan CORS; default `http://localhost:5173`. Production memakai origin Vercel tanpa trailing slash. |
+| `DEMO_PASSWORD`           | Seed saja, wajib saat seed | Password semua akun demo; minimal 12 karakter dan maksimal 72 byte UTF-8.                                                    |
+| `SUPABASE_URL`            | Backend, untuk resume      | URL project Supabase.                                                                                                        |
+| `SUPABASE_SECRET_KEY`     | Backend, untuk resume      | Secret server-only Supabase; jangan kirim ke browser.                                                                        |
+| `SUPABASE_STORAGE_BUCKET` | Backend                    | Nama private bucket; default `candidate-resumes`.                                                                            |
+| `TEST_DATABASE_URL`       | Backend tests              | Database PostgreSQL terpisah dengan nama berakhiran `_test`, schema `public`.                                                |
+| `VITE_API_BASE_URL`       | Frontend, public           | Base URL API termasuk `/api`; lokal `http://localhost:4000/api`, production URL HTTPS backend Railway dengan `/api`.         |
+
+Semua variabel `VITE_` masuk ke bundle browser. Jangan menyimpan `JWT_SECRET`, `DATABASE_URL`, atau Supabase secret pada frontend.
+
+## Resume dan Supabase Storage
+
+1. Buat project Supabase dan bucket **private** bernama `candidate-resumes`.
+2. Isi `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, dan `SUPABASE_STORAGE_BUCKET` di backend; restart server.
+3. Login sebagai Job Seeker, buka **Profil saya** dari menu akun, lalu unggah PDF asli maksimal **5 MiB**.
+
+Backend mengakses bucket dengan secret server-only dan memberikan signed URL yang berlaku **60 detik** setelah pemeriksaan hak akses. Perusahaan hanya dapat mengakses resume yang terlampir pada lamaran untuk lowongan miliknya. Tanpa konfigurasi storage, operasi yang memerlukan storage mengembalikan `503`; jangan membuat bucket public untuk mengatasi masalah akses.
+
+Seed tidak mengunggah PDF atau membuat lampiran palsu. Unggah dokumen contoh melalui halaman profil, lalu pilih resume saat melamar lowongan baru.
+
+## Database dan Seed
+
+Prisma mengelola schema dan migration PostgreSQL. Selalu jalankan `npm run db:migrate` sebelum `npm run db:seed`, dari direktori `server/`.
+
+Pada database baru, seed menyiapkan dua perusahaan, dua lowongan, dua Job Seeker beserta profilnya, dan empat lamaran dengan riwayat awal `Applied`. Kedua kandidat sudah melamar kedua lowongan demo; buat lowongan baru untuk mencoba alur Apply.
+
+Seed menggunakan upsert: menjalankannya kembali memperbarui password akun demo, nama perusahaan, dan data lowongan demo. Profil yang sudah ada, lampiran, status, dan riwayat lamaran dipertahankan. Seed tidak menghapus seluruh data dan **tidak boleh dijalankan otomatis pada setiap deployment production**. Jalankan hanya secara sengaja pada database tujuan yang telah diperiksa.
+
+## API Documentation
+
+Kontrak request, response, error, dan aturan akses: **[docs/api.md](docs/api.md)**.
+
+- `/api/auth/login`: login.
+- `/api/jobs`: daftar, detail, dan pembuatan lowongan; nested `/applications` untuk melamar atau melihat pelamar.
+- `/api/applications/me`, `/api/applications/:id/status`: lamaran sendiri dan pembaruan status oleh perusahaan pemilik.
+- `/api/profile/me`: profil kandidat dan endpoint resume terkait.
+- `/api/applications/:id/candidate` dan `/api/applications/:id/resume-url`: akses kandidat dan resume oleh perusahaan pemilik.
+
+Endpoint memerlukan bearer token sesuai perannya, kecuali login. Error menggunakan envelope JSON konsisten; lamaran duplikat menghasilkan `409 Conflict`.
+
+## Testing dan Quality Checks
+
+Jalankan per aplikasi, dari direktorinya masing-masing:
+
+| Pemeriksaan      | `server/`              | `client/`              |
+| ---------------- | ---------------------- | ---------------------- |
+| Lint             | `npm run lint`         | `npm run lint`         |
+| TypeScript       | `npm run typecheck`    | `npm run typecheck`    |
+| Format           | `npm run format:check` | `npm run format:check` |
+| Production build | `npm run build`        | `npm run build`        |
+| Unit tests       | `npm run test:unit`    | `npm test`             |
+| Seluruh tests    | `npm test`             | `npm test`             |
+
+Untuk integration tests backend, buat database khusus dan isi `TEST_DATABASE_URL` di `server/.env`:
+
+```bash
+createdb -h localhost -U <postgres-user> indokerja_test
+cd server
 npm run test:integration
-npm test
-npm run test:coverage
 ```
 
-Tests apply existing migrations automatically using the dedicated URL; do not change the application `DATABASE_URL` to run tests. Each test creates fresh fixtures in a transaction with unique email prefixes and runtime-generated credentials. Cleanup deletes only those fixtures, in foreign-key order; it never truncates tables or uses development seed data. Database tests run serially; concurrency cases explicitly submit simultaneous requests. Do not run multiple integration commands against the same database at once.
+Jalankan blok ini dari root repository. Gunakan URL database `indokerja_test` pada `TEST_DATABASE_URL`, bukan database development atau production. Test harness menerapkan migration dan membersihkan data test. Guard mewajibkan nama database berakhiran `_test`, schema `public`, dan database berbeda dari `DATABASE_URL`. `npm test` backend dan `npm run test:coverage` juga mencakup integration tests dan membutuhkan konfigurasi ini.
 
-Coverage uses Node's native experimental V8 coverage report, restricted to loaded `src/**/*.ts` files; generated Prisma code and test helpers are excluded. Startup-only code is not exercised by Supertest. The command prints line, branch, and function coverage in the terminal.
+Lakukan pengecekan manual: login kedua peran, buat lowongan, unggah/pilih resume, melamar, cek penolakan duplikat, ubah status, dan pastikan perusahaan lain tidak dapat mengakses pelamar.
 
-Cases cover credentials/JWT claims and verification, missing credentials, role boundaries, required job fields, job listing/creation, concurrent duplicate applications and direct database constraint rejection, seeker isolation, cross-company ownership, all supported statuses, no-op history, concurrent status changes, transaction rollback, database safety guards, and serialization retry limits.
+## Deployment
 
-## Production
+| Komponen       | Platform         |
+| -------------- | ---------------- |
+| Frontend       | Vercel           |
+| Backend        | Railway          |
+| PostgreSQL     | Railway          |
+| Resume Storage | Supabase Storage |
 
-```sh
-npm ci --include=dev
-npm run db:generate
-npm run build
-npm run db:migrate
-npm start
-```
+- **Vercel:** root directory `client`, build `npm run build`, output `dist`. Atur `VITE_API_BASE_URL` ke URL HTTPS API Railway berakhiran `/api` sebelum build. `client/vercel.json` menyediakan SPA rewrite.
+- **Railway:** root directory `server`. `server/railway.json` menetapkan build `npm run db:generate && npm run build`, pre-deploy `npm run db:migrate`, dan start `npm start`.
+- **Backend environment:** sediakan `DATABASE_URL` PostgreSQL Railway, `JWT_SECRET`, `CLIENT_ORIGIN` sesuai origin Vercel, serta konfigurasi Supabase untuk resume. Validasi environment tetap wajib; secret yang hilang harus diperbaiki di Railway.
+- **Seed production:** set `DEMO_PASSWORD` sesuai akun demo publik di atas, lalu jalankan `npm run db:seed` satu kali secara sengaja di environment Railway setelah migration berhasil. Jangan menjalankannya terhadap database lokal dan menganggap production telah terisi.
+- Jika migration terblokir oleh catatan gagal/P3009, ikuti **[panduan recovery Railway](docs/railway-migration-recovery.md)** setelah memeriksa status dan SQL yang mungkin sudah diterapkan; jangan reset database production.
 
-Set production environment variables before running these commands; use HTTPS and configure `CLIENT_ORIGIN` to the frontend URL. Seed explicitly once with demo accounts if desired. No automatic migration or seeding happens at server startup. PostgreSQL connection failure prevents startup.
+**Live frontend:** https://indokerja-job-application-managemen-theta.vercel.app/
 
-For the frontend, run `npm ci` and `npm run build` inside `client/` with the production `VITE_API_BASE_URL` set at build time, then deploy `client/dist/` to a static host. Configure that host to serve `index.html` for client routes such as `/jobs`, `/applications`, and `/company/jobs`; direct navigation and refresh must resolve through the React Router application. Use the deployed frontend origin for the backend CORS setting. `npm run preview` is a local build preview, not the production API server.
+Tautan production disediakan untuk review. Ketersediaan deployment, login demo, dan upload production perlu diverifikasi langsung; keberadaan konfigurasi deployment tidak membuktikan seluruh alur production sudah berhasil.
 
-### Railway backend and PostgreSQL
+## Assessment Submission
 
-1. Create a PostgreSQL service and a backend service from this repository.
-   Set the backend Root Directory to `/server` and Config File to
-   `/server/railway.json` (the config path is relative to the repository,
-   independently of Root Directory).
-2. Set `RAILPACK_NODE_VERSION=24`,
-   `RAILPACK_NODE_NPM_INSTALL=npm ci --include=dev`, and
-   `RAILPACK_PRUNE_DEPS=false`. Keep development dependencies available:
-   Prisma CLI runs migrations before deployment, and `tsx` runs the seed.
-3. Set the backend variables below, then deploy and generate a public HTTPS domain.
-
-| Variable        | Production value                                                                                                                |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`  | Railway PostgreSQL connection reference, for example `${{Postgres.DATABASE_URL}}` when the database service is named `Postgres` |
-| `JWT_SECRET`    | A randomly generated secret of at least 32 characters, stored only in Railway                                                   |
-| `CLIENT_ORIGIN` | Exact frontend HTTPS origin, without a path or trailing slash                                                                   |
-| `NODE_ENV`      | `production`                                                                                                                    |
-
-Railway supplies `PORT`; the server listens on that port on all interfaces.
-The configuration generates Prisma Client, builds TypeScript, runs only
-`prisma migrate deploy` before deployment, and starts the compiled server.
-A migration failure must block deployment. Do not use `migrate dev`,
-`migrate reset`, or `db push` against production. Back up existing data before
-applying future schema changes.
-
-For the assessment demo, set `DEMO_PASSWORD` securely (12+ characters, at most
-72 UTF-8 bytes) and run `npm run db:seed` once inside the deployed backend
-environment using Railway's service shell/SSH. Do not seed automatically on
-every deployment. Rerunning seed preserves applications/history but updates
-demo passwords and demo jobs. Never run tests against the production database.
-
-See [Railway monorepo configuration](https://docs.railway.com/deployments/monorepo)
-and [Railpack Node configuration](https://railpack.com/languages/node/).
-
-### Vercel frontend
-
-Import the repository with Root Directory `client`, framework preset Vite,
-Node.js `24.x`, install command `npm ci`, build command `npm run build`, and
-output directory `dist`. Set `VITE_API_BASE_URL` to the backend HTTPS URL
-including `/api` before building. Redeploy after changing it.
-`client/vercel.json` provides the
-[SPA fallback required for direct navigation](https://vercel.com/docs/frameworks/frontend/vite).
-Keep all secrets out of frontend variables. After the frontend domain is
-known, set Railway's `CLIENT_ORIGIN` to that exact origin and redeploy the API.
-Preview domains need a matching CORS setting; production configuration allows
-one origin.
-
-Before submission, verify login for both roles, direct-route refresh, job
-creation, applying, duplicate rejection, ownership rejection, and a status
-change visible to the seeker on the deployed URLs. Local checks alone do not
-verify deployment. Record the final URLs and demo-only credentials for reviewers.
-
-## Implementation decisions
-
-- The backend follows Routes → Controllers → Services → Prisma → PostgreSQL, defined in [AGENTS.md](AGENTS.md#5-official-layer-based-architecture). `src/routes/` wires authentication, authorization, validation, and thin controllers; `src/services/` owns database queries and business rules. Shared JWT settings and Prisma initialization live in `src/lib/`. `src/app.ts` composes Express for testing; `src/server.ts` starts and stops the server. Express 5 forwards async errors without a wrapper.
-- One Express server, Prisma, PostgreSQL; no public registration or extra infrastructure.
-- JWT access tokens expire after one hour. Only identity is carried in the token; protected requests load the current role/company from PostgreSQL. Logout discards the token; no refresh/revocation endpoint.
-- Password hashes use bcrypt cost 12. API responses select safe fields and never return hashes.
-- Salary is whole IDR/month, between 0 and 2,147,483,647; zero means zero. SQL also enforces nonnegative salary.
-- A unique `(jobId, jobSeekerId)` constraint prevents duplicate applications under races; conflicts return `409`.
-- Initial application/history creation is atomic. Status/history updates use serializable transactions and retry serialization conflicts up to three times after the initial attempt. Same-status updates return `200` without touching timestamps/history. Any of the five supported statuses may follow another; no extra workflow restrictions.
-- Foreign resource access returns `403`; nonexistent resources return `404`. Ownership is checked before reading applicants and inside status transactions.
-- Prisma CLI/client are pinned to the same major release. A `deepmerge-ts` override uses the patched version of a vulnerable CLI transitive dependency.
-
-See [docs/api.md](docs/api.md) for endpoints and response examples. Remaining submission work: deployment, deployed end-to-end verification with both roles, source push, candidate-created Google Doc, and submission form.
-
-## Candidate profiles and private resumes
-
-Job Seekers can edit their profile at `/profile`, upload PDF CV versions,
-preview their own CV, and choose a CV when confirming an application.
-Companies can open a read-only candidate detail page from their applicant list,
-preview/download the attached CV, and use the existing status control.
-Applying without a CV remains supported. Uploading a new version never changes
-the CV attached to an earlier application.
-
-### Supabase configuration
-
-1. Create a Supabase project and a **private** Storage bucket named
-   `candidate-resumes`. Do not make it public. Set the bucket file-size limit
-   to 5 MiB (5,242,880 bytes) and allowed MIME type to `application/pdf`.
-2. Set backend-only `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (a server secret
-   with Storage access), and `SUPABASE_STORAGE_BUCKET=candidate-resumes`.
-   Set these on Railway as well. Never put this secret in frontend variables.
-3. Run `npm run db:generate` and `npm run db:migrate` inside `server/`.
-   The additive migration `202610180002_candidate_profiles_resumes` preserves
-   existing applications. Do not run database reset commands.
-4. Restart the backend. No frontend Supabase credentials are required.
-
-Storage configuration is optional for existing job functionality; upload and
-signed-access operations return a safe 503 when storage is unavailable.
-The backend checks authentication, MIME type, PDF signature, and the 5 MiB limit.
-Files use generated unique paths; PostgreSQL stores metadata only. A failed
-metadata insert triggers cleanup of only the newly uploaded object.
-The most recently created successful upload is the current CV.
-
-CV access goes through the backend and returns a fresh signed URL valid for
-60 seconds with `Cache-Control: no-store`. These URLs are temporary bearer
-links; do not share them. Company access requires ownership of the application's
-job and always uses that application's original attachment. There is no
-resume-deletion endpoint.
-
-Automated profile/resume tests use mocked Storage operations and the dedicated
-PostgreSQL test database described above; they require no cloud credentials.
-Before deployment, verify real upload, preview, download, replacement, and
-cross-company denial against your private bucket and deployed URLs.
-
-For a previously failed Railway migration, follow [migration recovery](docs/railway-migration-recovery.md) before redeploying.
+- Repository: https://github.com/roihan37/indokerja-job-application-management
+- Live demo: https://indokerja-job-application-managemen-theta.vercel.app/
+- Akun dan password review: lihat **Demo Accounts** di awal dokumen.
