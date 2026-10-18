@@ -64,6 +64,20 @@ Frontend tests use Vitest and React Testing Library. All frontend tests, setup, 
 
 All use the password supplied through `DEMO_PASSWORD` during seeding. Document the deployed demo-only password when preparing the submission. Each company has a demo job: `demo-job-1` and `demo-job-2`.
 
+After applying migrations, run `npm run db:seed` inside `server/` to add
+candidate-profile demo data. Andi Pratama (`seeker@example.com`) has a complete
+profile; Siti Rahma (`seeker2@example.com`) has optional fields left empty to
+demonstrate fallbacks. Both candidates have an application for each demo job,
+so either company can open candidate details immediately. New applications
+include their initial `Applied` history entry atomically.
+
+Rerunning seed preserves existing profiles, application statuses, CV attachments,
+and history; it does not reset the database or duplicate applications. Seed does
+not create fake CV metadata or upload files to Supabase. To test CV selection,
+preview, and download, configure private Storage and upload a real PDF through
+the candidate's Profile page, then apply to a newly created job with that CV.
+Previously submitted demo applications intentionally remain without a CV.
+
 ## Checks
 
 Run the following backend commands inside `server/`.
