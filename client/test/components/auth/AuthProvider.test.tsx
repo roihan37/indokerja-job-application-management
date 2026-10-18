@@ -18,7 +18,7 @@ import {
   setSession,
 } from '@/lib/session';
 import { login as requestLogin } from '@/services/auth.service';
-import { makeSession } from '@/test/fixtures';
+import { makeSession } from '../../fixtures';
 
 vi.mock('@/services/auth.service', () => ({ login: vi.fn() }));
 vi.mock('sonner', () => ({ toast: { info: vi.fn() } }));

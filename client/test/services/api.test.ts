@@ -7,7 +7,7 @@ import {
   setSession,
 } from '@/lib/session';
 import { ApiError, api } from '@/services/api';
-import { makeSession } from '@/test/fixtures';
+import { makeSession } from '../fixtures';
 
 const fetchMock = vi.fn<typeof fetch>();
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { JobSummary } from '@/types/api';
 
-import { filterJobs } from './filterJobs';
+import { filterJobs } from '@/components/jobs/filterJobs';
 
 const jobs: JobSummary[] = [
   {

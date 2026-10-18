@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createJobSchema } from './createJob.schema';
+import { createJobSchema } from '@/pages/company/createJob.schema';
 
 const validJob = {
   title: 'Frontend Developer',

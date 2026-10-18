@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { AuthContext } from '@/hooks/useAuth';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
-import { makeSession } from '@/test/fixtures';
+import { makeSession } from '../fixtures';
 import type { User, UserRole } from '@/types/api';
 
 interface RouteCase {

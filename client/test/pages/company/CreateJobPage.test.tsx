@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearSession, setSession } from '@/lib/session';
 import { CreateJobPage } from '@/pages/company/CreateJobPage';
 import { createJob } from '@/services/jobs.service';
-import { makeSession } from '@/test/fixtures';
+import { makeSession } from '../../fixtures';
 import type { CreatedJob } from '@/types/api';
 
 vi.mock('@/services/jobs.service', () => ({ createJob: vi.fn() }));

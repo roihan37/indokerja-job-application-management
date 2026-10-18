@@ -9,7 +9,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { clearSession, setSession } from '@/lib/session';
 import { ApiError } from '@/services/api';
 import { updateApplicationStatus } from '@/services/applications.service';
-import { makeSession } from '@/test/fixtures';
+import { makeSession } from '../../fixtures';
 import type { JobApplicant, UpdatedApplication } from '@/types/api';
 
 vi.mock('@/services/applications.service', () => ({

@@ -6,7 +6,7 @@ import {
   getTokenExpiresAt,
   setSession,
 } from '@/lib/session';
-import { makeSession } from '@/test/fixtures';
+import { makeSession } from '../fixtures';
 
 describe('session storage', () => {
   beforeEach(() => {

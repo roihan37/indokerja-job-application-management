@@ -49,7 +49,7 @@ npm test
 npm run build
 ```
 
-Frontend tests use Vitest and React Testing Library. `npm run format` applies the same shared formatting conventions as the backend.
+Frontend tests use Vitest and React Testing Library. All frontend tests, setup, and fixtures live in `client/test/`, with subfolders matching the source structure. Backend tests live in `server/test/`. Keep test files outside `src/` in both applications. `npm run format` applies the same shared formatting conventions as the backend.
 
 ## Demo accounts
 
