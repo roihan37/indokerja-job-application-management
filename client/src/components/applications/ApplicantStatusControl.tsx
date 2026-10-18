@@ -68,6 +68,9 @@ export function ApplicantStatusControl({
               : currentApplication,
           ),
       );
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.candidate(application.id),
+      });
       setDesiredStatus(null);
       toast.success('Status lamaran berhasil diperbarui.');
       await queryClient.invalidateQueries({

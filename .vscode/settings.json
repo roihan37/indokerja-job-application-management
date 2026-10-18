@@ -2,5 +2,6 @@
   "typescript.tsdk": "server/node_modules/typescript/lib",
   "typescript.enablePromptUseWorkspaceTsdk": true,
   "eslint.workingDirectories": [{ "directory": "server" }],
-  "prisma.pinToPrisma6": true
+  "prisma.pinToPrisma6": true,
+  "js/ts.tsdk.path": "server/node_modules/typescript/lib"
 }

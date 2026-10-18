@@ -61,7 +61,7 @@ export async function api<T>(
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
   }
-  if (body !== undefined) {
+  if (body !== undefined && !(body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
 
@@ -70,7 +70,13 @@ export async function api<T>(
     response = await fetch(`${API_BASE_URL}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body:
+        body instanceof FormData
+          ? body
+          : body === undefined
+            ? undefined
+            : JSON.stringify(body),
+      cache: 'no-store',
       signal,
       credentials: 'omit',
     });
@@ -144,6 +150,11 @@ export function getErrorMessage(error: unknown): string {
       return 'Data yang Anda cari tidak ditemukan.';
     case 'ALREADY_APPLIED':
       return 'Anda sudah melamar lowongan ini.';
+    case 'INVALID_RESUME':
+      return 'Pilih CV PDF milik Anda dengan ukuran maksimal 5 MB.';
+    case 'STORAGE_UNAVAILABLE':
+    case 'STORAGE_ERROR':
+      return 'Penyimpanan CV belum tersedia. Silakan coba lagi nanti.';
     case 'VALIDATION_ERROR':
       return 'Periksa kembali data yang Anda masukkan.';
     case 'NETWORK_ERROR':

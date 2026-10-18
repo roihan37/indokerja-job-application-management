@@ -6,6 +6,16 @@ import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { HomeRedirect, RouteError } from '@/routes/UtilityPages';
 
 const lazyViews = {
+  ProfilePage: lazy(() =>
+    import('@/pages/seeker/ProfilePage').then(({ ProfilePage }) => ({
+      default: ProfilePage,
+    })),
+  ),
+  CandidatePage: lazy(() =>
+    import('@/pages/company/CandidatePage').then(({ CandidatePage }) => ({
+      default: CandidatePage,
+    })),
+  ),
   CompanyLayout: lazy(() =>
     import('@/components/layout/CompanyLayout').then(({ CompanyLayout }) => ({
       default: CompanyLayout,
@@ -84,6 +94,10 @@ export const router = createBrowserRouter([
         element: withSuspense(<lazyViews.SeekerLayout />),
         children: [
           {
+            path: '/profile',
+            element: withSuspense(<lazyViews.ProfilePage />),
+          },
+          {
             path: '/jobs',
             element: withSuspense(<lazyViews.JobsPage />),
           },
@@ -106,6 +120,10 @@ export const router = createBrowserRouter([
       {
         element: withSuspense(<lazyViews.CompanyLayout />),
         children: [
+          {
+            path: '/company/applications/:applicationId',
+            element: withSuspense(<lazyViews.CandidatePage />),
+          },
           {
             path: '/company/jobs',
             element: withSuspense(<lazyViews.CompanyJobsPage />),

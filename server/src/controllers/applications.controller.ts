@@ -18,6 +18,7 @@ export function createApplicationsController(db: PrismaClient) {
       db,
       res.locals.validated.params.id,
       res.locals.user.id,
+      res.locals.validated.body.resumeId,
     );
     res.status(201).json({ success: true, data });
   };

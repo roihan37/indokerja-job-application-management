@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
 
+import { ApplyConfirmation } from '@/components/jobs/ApplyConfirmation';
 import { Button } from '@/components/ui/button';
 import { queryKeys } from '@/lib/queryKeys';
 import { ApiError, getErrorMessage } from '@/services/api';
@@ -15,14 +16,17 @@ interface ApplyJobButtonProps {
 
 export function ApplyJobButton({ jobId }: ApplyJobButtonProps) {
   const queryClient = useQueryClient();
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
   const [conflictedJobId, setConflictedJobId] = useState<string | null>(null);
   const applications = useQuery({
     queryKey: queryKeys.myApplications,
     queryFn: ({ signal }) => getMyApplications(signal),
   });
   const apply = useMutation({
-    mutationFn: applyToJob,
+    mutationFn: ({ id, resumeId }: { id: string; resumeId?: string }) =>
+      applyToJob(id, resumeId),
     onSuccess: async () => {
+      setConfirmationOpen(false);
       toast.success('Lamaran berhasil dikirim. Semoga sukses!');
       await queryClient.invalidateQueries({
         queryKey: queryKeys.myApplications,
@@ -30,7 +34,8 @@ export function ApplyJobButton({ jobId }: ApplyJobButtonProps) {
     },
     onError: async (error, appliedJobId) => {
       if (error instanceof ApiError && error.code === 'ALREADY_APPLIED') {
-        setConflictedJobId(appliedJobId);
+        setConflictedJobId(appliedJobId.id);
+        setConfirmationOpen(false);
         toast.info('Anda sudah melamar lowongan ini.');
         await queryClient.invalidateQueries({
           queryKey: queryKeys.myApplications,
@@ -43,7 +48,7 @@ export function ApplyJobButton({ jobId }: ApplyJobButtonProps) {
   const alreadyApplied =
     applications.data?.some((application) => application.job.id === jobId) ||
     conflictedJobId === jobId ||
-    (apply.isSuccess && apply.variables === jobId);
+    (apply.isSuccess && apply.variables?.id === jobId);
 
   if (alreadyApplied) {
     return (
@@ -72,7 +77,7 @@ export function ApplyJobButton({ jobId }: ApplyJobButtonProps) {
         disabled={
           apply.isPending || applications.isPending || applications.isError
         }
-        onClick={() => apply.mutate(jobId)}
+        onClick={() => setConfirmationOpen(true)}
       >
         {apply.isPending || applications.isPending ? (
           <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
@@ -81,6 +86,13 @@ export function ApplyJobButton({ jobId }: ApplyJobButtonProps) {
         )}
         {apply.isPending ? 'Mengirim lamaran…' : 'Lamar sekarang'}
       </Button>
+      <ApplyConfirmation
+        open={confirmationOpen}
+        onOpenChange={setConfirmationOpen}
+        pending={apply.isPending}
+        error={apply.isError ? getErrorMessage(apply.error) : undefined}
+        onConfirm={(resumeId) => apply.mutate({ id: jobId, resumeId })}
+      />
       {applications.isError ? (
         <div className="text-center text-sm text-destructive" role="alert">
           <p>Status lamaran belum dapat dimuat.</p>

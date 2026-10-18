@@ -5,7 +5,10 @@ import { idParamsSchema } from './shared.schema.js';
 
 export const applyRequestSchema = z.object({
   params: idParamsSchema,
-  body: z.object({}).strict().default({}),
+  body: z
+    .object({ resumeId: idParamsSchema.shape.id.optional() })
+    .strict()
+    .default({}),
 });
 
 export const updateStatusRequestSchema = z.object({

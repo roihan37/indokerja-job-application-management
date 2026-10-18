@@ -20,7 +20,7 @@
 
 ### Content type and IDs
 
-- Request/response content type: `application/json`.
+- Request/response content type: `application/json`, except resume uploads (`multipart/form-data`).
 - `:id` is an opaque database identifier (1–128 ASCII letters, digits, underscores, or hyphens); generated IDs use CUIDs. Example values such as `job_123` are illustrative, not a required Prisma ID format.
 - Timestamps use ISO 8601 in UTC, for example `2026-10-18T02:00:00.000Z`.
 - `salary` is a whole integer from `0` through `2147483647` in **IDR per month**. Zero means zero, not unspecified.
@@ -222,7 +222,7 @@ The paths above match the *suggested routes* in `AGENTS.md`. Implement them cons
 **Access:** `JOB_SEEKER` only  
 **Purpose:** Apply to a job once per `(jobId, jobSeekerId)` pair.
 
-**Request:** No body or an empty object; unknown fields are rejected. Infer the job from `:id` and Job Seeker from the authenticated user.
+**Request:** No body, `{}`, or `{"resumeId":"resume-id"}`. Unknown fields are rejected. The optional resume must belong to the authenticated Job Seeker; otherwise return `400 INVALID_RESUME`. Infer the job from `:id` and Job Seeker from the authenticated user. The selected attachment is immutable after submission; later uploads do not replace it.
 
 **Response `201`**
 
@@ -484,3 +484,108 @@ curl -X PATCH "$BASE_URL/applications/app_123/status" \
 - [ ] Include this file at `docs/api.md` in the submitted repository.
 
 **Priority:** Complete and verify required features, deployment, and documentation within the **30-hour submission deadline**. Do not add optional API features just for completeness.
+
+## 12. Candidate profiles and private resumes
+
+The existing base remains `/api`; no separate `/api/v1` is introduced.
+All endpoints below require a bearer token. Successful responses use the
+existing `{ "success": true, "data": ... }` envelope and `Cache-Control: no-store`.
+
+| Method | Path | Role | Data |
+| --- | --- | --- | --- |
+| GET | /api/profile/me | JOB_SEEKER | Own profile and current resume |
+| PATCH | /api/profile/me | JOB_SEEKER | Create/update own profile |
+| POST | /api/profile/me/resume | JOB_SEEKER | Upload PDF; metadata, 201 |
+| GET | /api/profile/me/resumes | JOB_SEEKER | Own versions, newest first |
+| GET | /api/profile/me/resumes/:id/url | JOB_SEEKER | Own CV signed URL |
+| GET | /api/applications/:id/candidate | Owning COMPANY | Read-only candidate detail |
+| GET | /api/applications/:id/resume-url | Owning COMPANY | Attached CV signed URL |
+
+### Profile requests and responses
+
+PATCH accepts one or more of these nullable string fields; unknown fields and
+empty objects are rejected. Values are trimmed and blank strings become null:
+`fullName` (120 characters), `phone` (40), `location` (200),
+`headline` (200), `summary` (3000). Identity always comes from authentication.
+
+Example PATCH body:
+
+```json
+{"fullName":"Siti Rahma","headline":"Frontend Developer","summary":null}
+```
+
+GET and PATCH data example:
+
+```json
+{
+  "profile": {
+    "fullName": "Siti Rahma",
+    "phone": null,
+    "location": null,
+    "headline": "Frontend Developer",
+    "summary": null,
+    "createdAt": "2026-10-18T02:00:00.000Z",
+    "updatedAt": "2026-10-18T02:00:00.000Z"
+  },
+  "currentResume": {
+    "id": "resume-id",
+    "fileName": "cv.pdf",
+    "mimeType": "application/pdf",
+    "fileSize": 1024,
+    "createdAt": "2026-10-18T02:00:00.000Z"
+  }
+}
+```
+
+Uncreated profiles and missing current resumes return null independently.
+No authentication hashes or storage keys are exposed.
+
+### Upload and resume listing
+
+POST a multipart request containing exactly one `file` field and no text
+fields. PDF MIME type and a `%PDF-` signature are required; limit is
+5 MiB (5,242,880 bytes). Invalid uploads return `400 INVALID_RESUME`.
+The response data is the sanitized metadata object shown above.
+GET versions returns an array of the same metadata, sorted by creation time
+descending then ID descending. Uploads never overwrite existing files.
+
+```bash
+curl -X POST "$BASE_URL/profile/me/resume"   -H "Authorization: Bearer $TOKEN" -F 'file=@./cv.pdf;type=application/pdf'
+```
+
+Missing storage configuration returns `503 STORAGE_UNAVAILABLE`; storage operation
+failures return `503 STORAGE_ERROR`, with safe messages. Upload success means
+both file storage and metadata insertion succeeded. Missing Supabase configuration
+does not prevent login or existing job endpoints from working.
+
+### Candidate detail and access
+
+Candidate data shape:
+
+```json
+{
+  "id": "app_123",
+  "status": "Applied",
+  "createdAt": "2026-10-18T03:00:00.000Z",
+  "job": {"id":"job_123","title":"Frontend Developer"},
+  "jobSeeker": {"id":"usr_123","email":"seeker@example.com","profile":null},
+  "resume": null
+}
+```
+
+When present, profile and resume contain the safe fields illustrated above.
+Applicant listing also includes `jobSeeker.profile` with `fullName` and
+`headline`, or null. Profiles are read-only to companies.
+
+Both URL endpoints accept only an optional `download=true|false` query.
+The data is `{"url":"<temporary-signed-url>","expiresIn":60}`.
+Download mode sets the sanitized filename for download. Request a new URL for
+each preview/download; do not persist it. URLs expire after approximately
+60 seconds and grant bearer access until expiry.
+
+A company must own the application's job before candidate data is read or a
+CV URL is generated. Foreign company access returns 403; missing applications
+or attachments return 404. Seekers can access only their own CV URL endpoint;
+another seeker's resume returns 404. Unauthenticated requests return 401 and
+wrong roles return 403. The company endpoint always accesses the CV attached
+when applying, never the candidate's latest upload.

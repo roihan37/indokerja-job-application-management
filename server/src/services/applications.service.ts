@@ -4,6 +4,8 @@ import {
   type PrismaClient,
 } from '@prisma/client';
 
+import { profileSelect } from './profile.service.js';
+import { ownedApplication, resumeMetadataSelect } from './resumes.service.js';
 import type { AuthenticatedUser } from '../types/auth-user.js';
 import { AppError, forbidden, notFound } from '../utils/AppError.js';
 
@@ -21,6 +23,7 @@ export async function applyToJob(
   db: PrismaClient,
   jobId: string,
   jobSeekerId: string,
+  resumeId?: string,
 ) {
   if (
     !(await db.job.findUnique({
@@ -39,8 +42,21 @@ export async function applyToJob(
   }
   try {
     const data = await db.$transaction(async (tx) => {
+      if (
+        resumeId &&
+        !(await tx.resume.findFirst({
+          where: { id: resumeId, userId: jobSeekerId },
+          select: { id: true },
+        }))
+      ) {
+        throw new AppError(
+          400,
+          'INVALID_RESUME',
+          'Choose one of your own uploaded resumes',
+        );
+      }
       const application = await tx.application.create({
-        data: { jobId, jobSeekerId },
+        data: { jobId, jobSeekerId, ...(resumeId ? { resumeId } : {}) },
         select: {
           id: true,
           jobId: true,
@@ -112,7 +128,13 @@ export async function listJobApplicants(
       id: true,
       status: true,
       createdAt: true,
-      jobSeeker: { select: { id: true, email: true } },
+      jobSeeker: {
+        select: {
+          id: true,
+          email: true,
+          profile: { select: { fullName: true, headline: true } },
+        },
+      },
     },
     orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
   });
@@ -176,4 +198,25 @@ export async function updateApplicationStatus(
       throw error;
     }
   }
+}
+
+export async function getCandidate(
+  db: PrismaClient,
+  id: string,
+  user: AuthenticatedUser,
+) {
+  await ownedApplication(db, id, user);
+  return db.application.findUniqueOrThrow({
+    where: { id },
+    select: {
+      id: true,
+      status: true,
+      createdAt: true,
+      job: { select: { id: true, title: true } },
+      jobSeeker: {
+        select: { id: true, email: true, profile: { select: profileSelect } },
+      },
+      resume: { select: resumeMetadataSelect },
+    },
+  });
 }

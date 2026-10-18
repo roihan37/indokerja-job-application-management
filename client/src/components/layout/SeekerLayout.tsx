@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, ClipboardList } from 'lucide-react';
+import { BriefcaseBusiness, ClipboardList, UserRound } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router';
 
 import { UserMenu } from '@/components/layout/UserMenu';
@@ -19,6 +19,7 @@ export function SeekerLayout() {
             className="hidden h-full gap-7 sm:flex"
           >
             {[
+              { to: '/profile', label: 'Profil saya', icon: UserRound },
               { to: '/jobs', label: 'Cari lowongan', icon: BriefcaseBusiness },
               {
                 to: '/applications',
@@ -76,6 +77,20 @@ export function SeekerLayout() {
           >
             <ClipboardList className="size-4" aria-hidden="true" />
             Lamaran saya
+          </NavLink>
+          <NavLink
+            to="/profile"
+            className={({ isActive }) =>
+              cn(
+                'flex min-h-12 flex-1 items-center justify-center gap-2 border-b-2 text-sm font-medium',
+                isActive
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground',
+              )
+            }
+          >
+            <UserRound className="size-4" aria-hidden="true" />
+            Profil saya
           </NavLink>
         </nav>
       </header>

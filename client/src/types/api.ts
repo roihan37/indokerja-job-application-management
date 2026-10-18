@@ -85,6 +85,7 @@ export interface JobApplicant {
   jobSeeker: {
     id: string;
     email: string;
+    profile?: { fullName: string | null; headline: string | null } | null;
   };
   createdAt: string;
 }
@@ -99,4 +100,34 @@ export interface UpdatedApplication {
 export interface ApiErrorDetail {
   field: string;
   message: string;
+}
+
+export interface CandidateProfile {
+  fullName: string | null;
+  phone: string | null;
+  location: string | null;
+  headline: string | null;
+  summary: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface ResumeMetadata {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  createdAt: string;
+}
+export interface MyProfile {
+  profile: CandidateProfile | null;
+  currentResume: ResumeMetadata | null;
+}
+export interface CandidateDetail extends Omit<JobApplicant, 'jobSeeker'> {
+  job: { id: string; title: string };
+  jobSeeker: { id: string; email: string; profile: CandidateProfile | null };
+  resume: ResumeMetadata | null;
+}
+export interface ResumeAccess {
+  url: string;
+  expiresIn: number;
 }

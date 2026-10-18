@@ -4,7 +4,9 @@ Job application management for the IndoKerja full-stack assessment: a React fron
 
 ## Requirements and local setup
 
-- Node.js 22.12+ (backend verified with Node 24), npm, and PostgreSQL.
+- Node.js 24 LTS (24.15+ recommended), npm, and PostgreSQL. The supported
+  range is `^22.22.2 || ^24.15.0 || >=26.0.0`, matching the frontend test
+  dependencies (including jsdom); React Router also requires Node 22.22+.
 - Run commands below inside `server/`.
 
 ```sh
@@ -122,7 +124,7 @@ Cases cover credentials/JWT claims and verification, missing credentials, role b
 ## Production
 
 ```sh
-npm ci
+npm ci --include=dev
 npm run db:generate
 npm run build
 npm run db:migrate
@@ -132,6 +134,59 @@ npm start
 Set production environment variables before running these commands; use HTTPS and configure `CLIENT_ORIGIN` to the frontend URL. Seed explicitly once with demo accounts if desired. No automatic migration or seeding happens at server startup. PostgreSQL connection failure prevents startup.
 
 For the frontend, run `npm ci` and `npm run build` inside `client/` with the production `VITE_API_BASE_URL` set at build time, then deploy `client/dist/` to a static host. Configure that host to serve `index.html` for client routes such as `/jobs`, `/applications`, and `/company/jobs`; direct navigation and refresh must resolve through the React Router application. Use the deployed frontend origin for the backend CORS setting. `npm run preview` is a local build preview, not the production API server.
+
+### Railway backend and PostgreSQL
+
+1. Create a PostgreSQL service and a backend service from this repository.
+   Set the backend Root Directory to `/server` and Config File to
+   `/server/railway.json` (the config path is relative to the repository,
+   independently of Root Directory).
+2. Set `RAILPACK_NODE_VERSION=24`,
+   `RAILPACK_NODE_NPM_INSTALL=npm ci --include=dev`, and
+   `RAILPACK_PRUNE_DEPS=false`. Keep development dependencies available:
+   Prisma CLI runs migrations before deployment, and `tsx` runs the seed.
+3. Set the backend variables below, then deploy and generate a public HTTPS domain.
+
+| Variable        | Production value                                                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`  | Railway PostgreSQL connection reference, for example `${{Postgres.DATABASE_URL}}` when the database service is named `Postgres` |
+| `JWT_SECRET`    | A randomly generated secret of at least 32 characters, stored only in Railway                                                   |
+| `CLIENT_ORIGIN` | Exact frontend HTTPS origin, without a path or trailing slash                                                                   |
+| `NODE_ENV`      | `production`                                                                                                                    |
+
+Railway supplies `PORT`; the server listens on that port on all interfaces.
+The configuration generates Prisma Client, builds TypeScript, runs only
+`prisma migrate deploy` before deployment, and starts the compiled server.
+A migration failure must block deployment. Do not use `migrate dev`,
+`migrate reset`, or `db push` against production. Back up existing data before
+applying future schema changes.
+
+For the assessment demo, set `DEMO_PASSWORD` securely (12+ characters, at most
+72 UTF-8 bytes) and run `npm run db:seed` once inside the deployed backend
+environment using Railway's service shell/SSH. Do not seed automatically on
+every deployment. Rerunning seed preserves applications/history but updates
+demo passwords and demo jobs. Never run tests against the production database.
+
+See [Railway monorepo configuration](https://docs.railway.com/deployments/monorepo)
+and [Railpack Node configuration](https://railpack.com/languages/node/).
+
+### Vercel frontend
+
+Import the repository with Root Directory `client`, framework preset Vite,
+Node.js `24.x`, install command `npm ci`, build command `npm run build`, and
+output directory `dist`. Set `VITE_API_BASE_URL` to the backend HTTPS URL
+including `/api` before building. Redeploy after changing it.
+`client/vercel.json` provides the
+[SPA fallback required for direct navigation](https://vercel.com/docs/frameworks/frontend/vite).
+Keep all secrets out of frontend variables. After the frontend domain is
+known, set Railway's `CLIENT_ORIGIN` to that exact origin and redeploy the API.
+Preview domains need a matching CORS setting; production configuration allows
+one origin.
+
+Before submission, verify login for both roles, direct-route refresh, job
+creation, applying, duplicate rejection, ownership rejection, and a status
+change visible to the seeker on the deployed URLs. Local checks alone do not
+verify deployment. Record the final URLs and demo-only credentials for reviewers.
 
 ## Implementation decisions
 
@@ -146,3 +201,43 @@ For the frontend, run `npm ci` and `npm run build` inside `client/` with the pro
 - Prisma CLI/client are pinned to the same major release. A `deepmerge-ts` override uses the patched version of a vulnerable CLI transitive dependency.
 
 See [docs/api.md](docs/api.md) for endpoints and response examples. Remaining submission work: deployment, deployed end-to-end verification with both roles, source push, candidate-created Google Doc, and submission form.
+
+## Candidate profiles and private resumes
+
+Job Seekers can edit their profile at `/profile`, upload PDF CV versions,
+preview their own CV, and choose a CV when confirming an application.
+Companies can open a read-only candidate detail page from their applicant list,
+preview/download the attached CV, and use the existing status control.
+Applying without a CV remains supported. Uploading a new version never changes
+the CV attached to an earlier application.
+
+### Supabase configuration
+
+1. Create a Supabase project and a **private** Storage bucket named
+   `candidate-resumes`. Do not make it public. Set the bucket file-size limit
+   to 5 MiB (5,242,880 bytes) and allowed MIME type to `application/pdf`.
+2. Set backend-only `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (a server secret
+   with Storage access), and `SUPABASE_STORAGE_BUCKET=candidate-resumes`.
+   Set these on Railway as well. Never put this secret in frontend variables.
+3. Run `npm run db:generate` and `npm run db:migrate` inside `server/`.
+   The additive migration `20261018000000_candidate_profiles_resumes` preserves
+   existing applications. Do not run database reset commands.
+4. Restart the backend. No frontend Supabase credentials are required.
+
+Storage configuration is optional for existing job functionality; upload and
+signed-access operations return a safe 503 when storage is unavailable.
+The backend checks authentication, MIME type, PDF signature, and the 5 MiB limit.
+Files use generated unique paths; PostgreSQL stores metadata only. A failed
+metadata insert triggers cleanup of only the newly uploaded object.
+The most recently created successful upload is the current CV.
+
+CV access goes through the backend and returns a fresh signed URL valid for
+60 seconds with `Cache-Control: no-store`. These URLs are temporary bearer
+links; do not share them. Company access requires ownership of the application's
+job and always uses that application's original attachment. There is no
+resume-deletion endpoint.
+
+Automated profile/resume tests use mocked Storage operations and the dedicated
+PostgreSQL test database described above; they require no cloud credentials.
+Before deployment, verify real upload, preview, download, replacement, and
+cross-company denial against your private bucket and deployed URLs.

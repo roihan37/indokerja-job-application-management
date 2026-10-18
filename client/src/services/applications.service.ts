@@ -7,10 +7,13 @@ import type {
   UpdatedApplication,
 } from '@/types/api';
 
-export function applyToJob(jobId: string): Promise<CreatedApplication> {
+export function applyToJob(
+  jobId: string,
+  resumeId?: string,
+): Promise<CreatedApplication> {
   return api<CreatedApplication>(
     `/jobs/${encodeURIComponent(jobId)}/applications`,
-    { method: 'POST' },
+    { method: 'POST', ...(resumeId ? { body: { resumeId } } : {}) },
   );
 }
 

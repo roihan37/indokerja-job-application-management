@@ -112,8 +112,25 @@ export function ApplicantsPage() {
                         <article className="flex min-w-0 flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
                           <div className="min-w-0 space-y-3">
                             <h3 className="text-sm font-semibold wrap-anywhere sm:text-base">
-                              {application.jobSeeker.email}
+                              {application.jobSeeker.profile?.fullName ||
+                                application.jobSeeker.email}
                             </h3>
+                            {application.jobSeeker.profile?.fullName && (
+                              <p className="text-sm text-muted-foreground wrap-anywhere">
+                                {application.jobSeeker.email}
+                              </p>
+                            )}
+                            {application.jobSeeker.profile?.headline && (
+                              <p className="text-sm wrap-anywhere">
+                                {application.jobSeeker.profile.headline}
+                              </p>
+                            )}
+                            <Link
+                              to={`/company/applications/${application.id}`}
+                              className="inline-flex min-h-10 items-center text-sm font-medium text-primary underline-offset-4 hover:underline"
+                            >
+                              Lihat profil
+                            </Link>
                             <div className="flex flex-wrap items-center gap-3">
                               <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                                 <CalendarDays
