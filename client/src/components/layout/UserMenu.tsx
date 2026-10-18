@@ -1,4 +1,5 @@
 import { ChevronDown, LogOut, UserRound } from 'lucide-react';
+import { Link } from 'react-router';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -41,6 +42,14 @@ export function UserMenu() {
           </p>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {user?.role === 'JOB_SEEKER' && (
+          <DropdownMenuItem asChild>
+            <Link to="/profile">
+              <UserRound aria-hidden="true" />
+              Profil saya
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={logout}>
           <LogOut aria-hidden="true" />
           Keluar
