@@ -234,7 +234,7 @@ the CV attached to an earlier application.
    with Storage access), and `SUPABASE_STORAGE_BUCKET=candidate-resumes`.
    Set these on Railway as well. Never put this secret in frontend variables.
 3. Run `npm run db:generate` and `npm run db:migrate` inside `server/`.
-   The additive migration `20261018000000_candidate_profiles_resumes` preserves
+   The additive migration `202610180002_candidate_profiles_resumes` preserves
    existing applications. Do not run database reset commands.
 4. Restart the backend. No frontend Supabase credentials are required.
 
@@ -255,3 +255,5 @@ Automated profile/resume tests use mocked Storage operations and the dedicated
 PostgreSQL test database described above; they require no cloud credentials.
 Before deployment, verify real upload, preview, download, replacement, and
 cross-company denial against your private bucket and deployed URLs.
+
+For a previously failed Railway migration, follow [migration recovery](docs/railway-migration-recovery.md) before redeploying.
